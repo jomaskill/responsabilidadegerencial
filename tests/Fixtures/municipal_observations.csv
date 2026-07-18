@@ -1,0 +1,4 @@
+municipality_code;indicator_slug;indicator_version;reference_year;value;numerator;denominator;availability_status;quality_status;period_start;period_end;notes
+3550308;population;1;2024;12000000;;;available;accepted;;;IBGE population
+3550308;homicide_count;1;2024;120;;;available;accepted;;;SIM deaths
+9999999;population;1;2024;1000;;;available;accepted;;;Invalid municipality for rejection test

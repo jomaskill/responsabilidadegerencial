@@ -1,0 +1,24 @@
+[
+  {
+    "id": 3550308,
+    "nome": "São Paulo",
+    "microrregiao": {
+      "mesorregiao": {
+        "UF": {
+          "sigla": "SP"
+        }
+      }
+    }
+  },
+  {
+    "id": 5101837,
+    "nome": "Boa Esperança do Norte",
+    "microrregiao": {
+      "mesorregiao": {
+        "UF": {
+          "sigla": "MT"
+        }
+      }
+    }
+  }
+]
