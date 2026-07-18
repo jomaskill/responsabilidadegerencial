@@ -2,6 +2,9 @@
 
 namespace App\Actions\MunicipalData;
 
+use App\Contracts\MunicipalData\SanitationFetcher;
+use App\DTO\MunicipalData\ImportPeriod;
+use App\DTO\MunicipalData\ImportSummary;
 use App\Enums\AvailabilityStatus;
 use App\Enums\ProcessingStatus;
 use App\Enums\QualityStatus;
@@ -9,11 +12,10 @@ use App\Enums\ReleaseStatus;
 use App\Models\DataSource;
 use App\Models\IndicatorObservation;
 use App\Models\IndicatorVersion;
+use App\Models\Municipality;
 use App\Models\ProcessingRun;
 use App\Models\SourceRelease;
-use App\MunicipalData\ImportSummary;
-use App\MunicipalData\Parsers\SinisaSanitationArchiveParser;
-use App\MunicipalData\SanitationFetcher;
+use App\Support\MunicipalData\Parsers\SinisaSanitationArchiveParser;
 use Illuminate\Support\Facades\DB;
 use JsonException;
 use RuntimeException;
@@ -27,15 +29,11 @@ class ImportSinisaSanitation
         private readonly SinisaSanitationArchiveParser $parser,
     ) {}
 
-    public function execute(int $fromYear, int $toYear): ImportSummary
+    public function execute(ImportPeriod $period): ImportSummary
     {
-        if ($fromYear > $toYear) {
-            throw new RuntimeException('The initial year must be less than or equal to the final year.');
-        }
-
         $year = (int) config('municipal_data.sinisa.reference_year');
 
-        if ($year < $fromYear || $year > $toYear) {
+        if (! $period->contains($year)) {
             return new ImportSummary(0, 0, 0, 0);
         }
 
@@ -49,7 +47,7 @@ class ImportSinisaSanitation
         $artifact = $this->fetcher->fetch();
         $stored = $this->artifactStore->fromFetched($source, $artifact);
         $parsed = $this->parser->datasets($artifact->contents);
-        $releaseVersion = $this->releaseVersion($configuredDatasets, $stored['checksum']);
+        $releaseVersion = $this->releaseVersion($configuredDatasets, $stored->checksum);
         $run = ProcessingRun::query()->create([
             'data_source_id' => $source->id,
             'type' => 'sinisa_sanitation_import',
@@ -58,7 +56,7 @@ class ImportSinisaSanitation
             'parameters' => [
                 'reference_year' => $year,
                 'indicator_slugs' => array_keys($configuredDatasets),
-                'artifact_checksum' => $stored['checksum'],
+                'artifact_checksum' => $stored->checksum,
                 'release_version' => $releaseVersion,
             ],
         ]);
@@ -103,11 +101,11 @@ class ImportSinisaSanitation
                         'published_at' => (string) config('municipal_data.sinisa.published_at'),
                         'collected_at' => now()->toDateString(),
                         'source_url' => $artifact->sourceUrl,
-                        'artifact_disk' => $stored['disk'],
-                        'artifact_path' => $stored['path'],
-                        'checksum_sha256' => $stored['checksum'],
-                        'mime_type' => $stored['mime_type'],
-                        'size_bytes' => $stored['size_bytes'],
+                        'artifact_disk' => $stored->disk,
+                        'artifact_path' => $stored->path,
+                        'checksum_sha256' => $stored->checksum,
+                        'mime_type' => $stored->mimeType,
+                        'size_bytes' => $stored->sizeBytes,
                         'metadata' => [
                             'reference_year' => $year,
                             'datasets' => $configuredDatasets,
@@ -253,13 +251,7 @@ class ImportSinisaSanitation
     {
         $municipalities = [];
 
-        foreach (DB::table('municipalities')->where('is_active', true)->cursor() as $municipality) {
-            $installedAt = is_string($municipality->installed_at) ? $municipality->installed_at : null;
-
-            if ($installedAt !== null && (int) substr($installedAt, 0, 4) > $year) {
-                continue;
-            }
-
+        foreach (Municipality::query()->where('is_active', true)->existingInYear($year)->cursor() as $municipality) {
             $municipalities[(int) $municipality->ibge_code] = (int) $municipality->id;
         }
 

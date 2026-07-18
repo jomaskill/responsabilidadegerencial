@@ -2,6 +2,10 @@
 
 namespace App\Actions\MunicipalData;
 
+use App\Contracts\MunicipalData\GdpFetcher;
+use App\DTO\MunicipalData\ImportPeriod;
+use App\DTO\MunicipalData\ImportSummary;
+use App\DTO\MunicipalData\StoredSourceArtifact;
 use App\Enums\AvailabilityStatus;
 use App\Enums\ProcessingStatus;
 use App\Enums\QualityStatus;
@@ -9,11 +13,10 @@ use App\Enums\ReleaseStatus;
 use App\Models\DataSource;
 use App\Models\IndicatorObservation;
 use App\Models\IndicatorVersion;
+use App\Models\Municipality;
 use App\Models\ProcessingRun;
 use App\Models\SourceRelease;
-use App\MunicipalData\GdpFetcher;
-use App\MunicipalData\ImportSummary;
-use App\MunicipalData\Parsers\GdpArchiveParser;
+use App\Support\MunicipalData\Parsers\GdpArchiveParser;
 use Illuminate\Support\Facades\DB;
 use JsonException;
 use RuntimeException;
@@ -27,11 +30,10 @@ class ImportIbgeGdp
         private readonly GdpArchiveParser $parser,
     ) {}
 
-    public function execute(int $fromYear, int $toYear): ImportSummary
+    public function execute(ImportPeriod $period): ImportSummary
     {
-        if ($fromYear > $toYear) {
-            throw new RuntimeException('The initial year must be less than or equal to the final year.');
-        }
+        $fromYear = $period->fromYear;
+        $toYear = $period->toYear;
 
         $years = $this->configuredYears($fromYear, $toYear);
 
@@ -75,14 +77,13 @@ class ImportIbgeGdp
 
     /**
      * @param  array<string, IndicatorVersion>  $versions
-     * @param  array{disk: string, path: string, checksum: string, mime_type: string, size_bytes: int}  $stored
      * @param  array<int, array{gdp_nominal: int, gdp_per_capita: string}>  $records
      */
     private function importYear(
         DataSource $source,
         array $versions,
         string $sourceUrl,
-        array $stored,
+        StoredSourceArtifact $stored,
         int $year,
         array $records,
     ): ImportSummary {
@@ -93,7 +94,7 @@ class ImportIbgeGdp
             'started_at' => now(),
             'parameters' => [
                 'reference_year' => $year,
-                'artifact_checksum' => $stored['checksum'],
+                'artifact_checksum' => $stored->checksum,
                 'source_entry' => config('municipal_data.gdp.entry'),
             ],
         ]);
@@ -133,18 +134,18 @@ class ImportIbgeGdp
                     [
                         'data_source_id' => $source->id,
                         'reference_year' => $year,
-                        'version' => 'official-'.substr($stored['checksum'], 0, 16),
+                        'version' => 'official-'.substr($stored->checksum, 0, 16),
                     ],
                     [
                         'status' => ReleaseStatus::Final,
                         'published_at' => (string) $configuration['published_at'],
                         'collected_at' => now()->toDateString(),
                         'source_url' => $sourceUrl,
-                        'artifact_disk' => $stored['disk'],
-                        'artifact_path' => $stored['path'],
-                        'checksum_sha256' => $stored['checksum'],
-                        'mime_type' => $stored['mime_type'],
-                        'size_bytes' => $stored['size_bytes'],
+                        'artifact_disk' => $stored->disk,
+                        'artifact_path' => $stored->path,
+                        'checksum_sha256' => $stored->checksum,
+                        'mime_type' => $stored->mimeType,
+                        'size_bytes' => $stored->sizeBytes,
                         'metadata' => $this->releaseMetadata($year),
                     ],
                 );
@@ -261,13 +262,7 @@ class ImportIbgeGdp
     {
         $municipalities = [];
 
-        foreach (DB::table('municipalities')->where('is_active', true)->cursor() as $municipality) {
-            $installedAt = is_string($municipality->installed_at) ? $municipality->installed_at : null;
-
-            if ($installedAt !== null && (int) substr($installedAt, 0, 4) > $year) {
-                continue;
-            }
-
+        foreach (Municipality::query()->where('is_active', true)->existingInYear($year)->cursor() as $municipality) {
             $municipalities[(int) $municipality->ibge_code] = (int) $municipality->id;
         }
 

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\MunicipalityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +15,20 @@ class Municipality extends Model
 {
     /** @use HasFactory<MunicipalityFactory> */
     use HasFactory;
+
+    /**
+     * @param  Builder<Municipality>  $query
+     * @return Builder<Municipality>
+     */
+    public function scopeExistingInYear(Builder $query, int $year): Builder
+    {
+        $yearStart = "{$year}-01-01";
+        $yearEnd = "{$year}-12-31";
+
+        return $query
+            ->where(fn (Builder $builder) => $builder->whereNull('installed_at')->orWhere('installed_at', '<=', $yearEnd))
+            ->where(fn (Builder $builder) => $builder->whereNull('extinct_at')->orWhere('extinct_at', '>=', $yearStart));
+    }
 
     /** @return BelongsTo<FederativeUnit, $this> */
     public function federativeUnit(): BelongsTo

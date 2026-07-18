@@ -75,6 +75,12 @@ Validation is layered, not duplicated indiscriminately:
 
 - Be concise in your explanations - focus on what's important rather than explaining obvious details.
 
+## User-Facing Language
+
+- All user-facing documentation and text must be written in Brazilian Portuguese.
+- This includes interface copy, validation messages, command output, error messages, notifications, emails, help text, public API messages, and project documentation intended for users or operators.
+- Code identifiers, class names, method names, database columns, configuration keys, and other internal technical identifiers may remain in English.
+
 === boost rules ===
 
 # Laravel Boost

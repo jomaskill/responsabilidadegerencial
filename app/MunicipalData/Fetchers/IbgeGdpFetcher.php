@@ -2,8 +2,8 @@
 
 namespace App\MunicipalData\Fetchers;
 
-use App\MunicipalData\GdpFetcher;
-use App\MunicipalData\SourceArtifact;
+use App\Contracts\MunicipalData\GdpFetcher;
+use App\DTO\MunicipalData\SourceArtifact;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Http;
 

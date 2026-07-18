@@ -2,8 +2,8 @@
 
 namespace App\MunicipalData\Fetchers;
 
-use App\MunicipalData\CensusIndicatorFetcher;
-use App\MunicipalData\SourceArtifact;
+use App\Contracts\MunicipalData\CensusIndicatorFetcher;
+use App\DTO\MunicipalData\SourceArtifact;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;

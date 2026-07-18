@@ -1,7 +1,9 @@
 <?php
 
-namespace App\MunicipalData\Calculators;
+namespace App\Actions\MunicipalData;
 
+use App\DTO\MunicipalData\ImportPeriod;
+use App\DTO\MunicipalData\ImportSummary;
 use App\Enums\AvailabilityStatus;
 use App\Enums\ProcessingStatus;
 use App\Enums\QualityStatus;
@@ -11,18 +13,18 @@ use App\Models\IndicatorObservation;
 use App\Models\IndicatorVersion;
 use App\Models\ProcessingRun;
 use App\Models\SourceRelease;
-use App\MunicipalData\ImportSummary;
-use App\MunicipalData\IndicatorCalculator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use JsonException;
 use Throwable;
 
-class HomicideIndicatorCalculator implements IndicatorCalculator
+class RecalculateHomicideIndicators
 {
-    public function calculate(int $fromYear, int $toYear, ?string $indicatorSlug = null): ImportSummary
+    public function execute(ImportPeriod $period, ?string $indicatorSlug = null): ImportSummary
     {
+        $fromYear = $period->fromYear;
+        $toYear = $period->toYear;
         $supported = ['homicide_rate', 'homicide_rate_rolling_3y'];
         $requested = $indicatorSlug === null ? $supported : [$indicatorSlug];
 
@@ -44,7 +46,7 @@ class HomicideIndicatorCalculator implements IndicatorCalculator
 
         try {
             foreach ($requested as $slug) {
-                foreach (range($fromYear, $toYear) as $year) {
+                foreach ($period->years() as $year) {
                     $records = $slug === 'homicide_rate'
                         ? $this->annualRecords($year)
                         : $this->rollingRecords($year);

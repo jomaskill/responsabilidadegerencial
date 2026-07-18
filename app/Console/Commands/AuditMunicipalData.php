@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\MunicipalData\DataQualityAuditor;
+use App\Actions\MunicipalData\AuditMunicipalDataQuality;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -11,11 +11,11 @@ use Illuminate\Console\Command;
 #[Description('Audit ranges and quality flags in current municipal observations')]
 class AuditMunicipalData extends Command
 {
-    public function handle(DataQualityAuditor $auditor): int
+    public function handle(AuditMunicipalDataQuality $action): int
     {
         $year = (int) ($this->option('year') ?: now()->year);
         $source = $this->option('source');
-        $result = $auditor->audit($year, is_string($source) ? $source : null);
+        $result = $action->execute($year, is_string($source) ? $source : null);
 
         $this->table(
             ['Observações verificadas', 'Alertas', 'Rejeitadas'],

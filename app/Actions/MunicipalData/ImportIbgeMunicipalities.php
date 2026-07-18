@@ -2,6 +2,8 @@
 
 namespace App\Actions\MunicipalData;
 
+use App\Contracts\MunicipalData\SourceFetcher;
+use App\DTO\MunicipalData\ImportSummary;
 use App\Enums\ProcessingStatus;
 use App\Enums\ReleaseStatus;
 use App\Models\DataSource;
@@ -11,15 +13,13 @@ use App\Models\MunicipalityIdentifier;
 use App\Models\ProcessingError;
 use App\Models\ProcessingRun;
 use App\Models\SourceRelease;
-use App\MunicipalData\Fetchers\IbgeMunicipalityFetcher;
-use App\MunicipalData\ImportSummary;
 use Illuminate\Support\Str;
 use Throwable;
 
 class ImportIbgeMunicipalities
 {
     public function __construct(
-        private readonly IbgeMunicipalityFetcher $fetcher,
+        private readonly SourceFetcher $fetcher,
         private readonly StoreSourceArtifact $artifactStore,
     ) {}
 
@@ -33,18 +33,18 @@ class ImportIbgeMunicipalities
             [
                 'data_source_id' => $source->id,
                 'reference_year' => $referenceYear,
-                'version' => 'snapshot-'.substr($stored['checksum'], 0, 12),
+                'version' => 'snapshot-'.substr($stored->checksum, 0, 12),
             ],
             [
                 'status' => ReleaseStatus::Final,
                 'published_at' => $artifact->publishedAt?->format('Y-m-d'),
                 'collected_at' => now()->toDateString(),
                 'source_url' => $artifact->sourceUrl,
-                'artifact_disk' => $stored['disk'],
-                'artifact_path' => $stored['path'],
-                'checksum_sha256' => $stored['checksum'],
-                'mime_type' => $stored['mime_type'],
-                'size_bytes' => $stored['size_bytes'],
+                'artifact_disk' => $stored->disk,
+                'artifact_path' => $stored->path,
+                'checksum_sha256' => $stored->checksum,
+                'mime_type' => $stored->mimeType,
+                'size_bytes' => $stored->sizeBytes,
             ],
         );
 

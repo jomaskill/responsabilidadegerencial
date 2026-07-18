@@ -2,8 +2,8 @@
 
 namespace App\MunicipalData\Fetchers;
 
-use App\MunicipalData\IdebFetcher;
-use App\MunicipalData\SourceArtifact;
+use App\Contracts\MunicipalData\IdebFetcher;
+use App\DTO\MunicipalData\SourceArtifact;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;

@@ -2,9 +2,9 @@
 
 namespace App\MunicipalData\Fetchers;
 
-use App\MunicipalData\HomicideFetcher;
-use App\MunicipalData\HomicideSourceDefinition;
-use App\MunicipalData\SourceArtifact;
+use App\Contracts\MunicipalData\HomicideFetcher;
+use App\DTO\MunicipalData\HomicideSourceDefinition;
+use App\DTO\MunicipalData\SourceArtifact;
 use Illuminate\Support\Facades\Http;
 
 class DatasusHomicideFetcher implements HomicideFetcher

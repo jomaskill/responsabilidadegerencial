@@ -2,8 +2,8 @@
 
 namespace App\MunicipalData\Fetchers;
 
-use App\MunicipalData\SourceArtifact;
-use App\MunicipalData\SourceFetcher;
+use App\Contracts\MunicipalData\SourceFetcher;
+use App\DTO\MunicipalData\SourceArtifact;
 use Illuminate\Support\Facades\Http;
 
 class IbgeMunicipalityFetcher implements SourceFetcher

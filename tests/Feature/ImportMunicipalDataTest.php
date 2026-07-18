@@ -1,11 +1,11 @@
 <?php
 
+use App\Actions\MunicipalData\ReportMunicipalDataCoverage;
 use App\Models\FederativeUnit;
 use App\Models\IndicatorObservation;
 use App\Models\Municipality;
 use App\Models\ProcessingError;
 use App\Models\SourceRelease;
-use App\MunicipalData\Auditors\MunicipalCoverageAuditor;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -39,7 +39,7 @@ test('canonical csv import preserves its artifact and rejects invalid rows', fun
     expect(IndicatorObservation::query()->count())->toBe(2)
         ->and(ProcessingError::query()->count())->toBe(1);
 
-    $populationCoverage = collect(app(MunicipalCoverageAuditor::class)->coverage(2024))
+    $populationCoverage = collect(app(ReportMunicipalDataCoverage::class)->execute(2024))
         ->firstWhere('indicator', 'population');
 
     expect($populationCoverage['coverage_percent'])->toBe(100.0);

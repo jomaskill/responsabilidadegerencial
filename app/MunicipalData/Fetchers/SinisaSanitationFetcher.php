@@ -2,8 +2,8 @@
 
 namespace App\MunicipalData\Fetchers;
 
-use App\MunicipalData\SanitationFetcher;
-use App\MunicipalData\SourceArtifact;
+use App\Contracts\MunicipalData\SanitationFetcher;
+use App\DTO\MunicipalData\SourceArtifact;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;

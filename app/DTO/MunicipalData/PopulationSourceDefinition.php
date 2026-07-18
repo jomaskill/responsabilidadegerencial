@@ -1,6 +1,6 @@
 <?php
 
-namespace App\MunicipalData;
+namespace App\DTO\MunicipalData;
 
 use DateTimeImmutable;
 

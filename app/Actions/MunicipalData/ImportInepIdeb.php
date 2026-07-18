@@ -2,6 +2,10 @@
 
 namespace App\Actions\MunicipalData;
 
+use App\Contracts\MunicipalData\IdebFetcher;
+use App\DTO\MunicipalData\ImportPeriod;
+use App\DTO\MunicipalData\ImportSummary;
+use App\DTO\MunicipalData\StoredSourceArtifact;
 use App\Enums\AvailabilityStatus;
 use App\Enums\ProcessingStatus;
 use App\Enums\QualityStatus;
@@ -9,11 +13,10 @@ use App\Enums\ReleaseStatus;
 use App\Models\DataSource;
 use App\Models\IndicatorObservation;
 use App\Models\IndicatorVersion;
+use App\Models\Municipality;
 use App\Models\ProcessingRun;
 use App\Models\SourceRelease;
-use App\MunicipalData\IdebFetcher;
-use App\MunicipalData\ImportSummary;
-use App\MunicipalData\Parsers\IdebWorkbookParser;
+use App\Support\MunicipalData\Parsers\IdebWorkbookParser;
 use Illuminate\Support\Facades\DB;
 use JsonException;
 use RuntimeException;
@@ -27,11 +30,10 @@ class ImportInepIdeb
         private readonly IdebWorkbookParser $parser,
     ) {}
 
-    public function execute(int $fromYear, int $toYear): ImportSummary
+    public function execute(ImportPeriod $period): ImportSummary
     {
-        if ($fromYear > $toYear) {
-            throw new RuntimeException('The initial year must be less than or equal to the final year.');
-        }
+        $fromYear = $period->fromYear;
+        $toYear = $period->toYear;
 
         $cycles = array_values(array_filter(
             array_map('intval', (array) config('municipal_data.ideb.cycles')),
@@ -99,14 +101,13 @@ class ImportInepIdeb
     }
 
     /**
-     * @param  array{disk: string, path: string, checksum: string, mime_type: string, size_bytes: int}  $stored
      * @param  array<string, array<string, int|string>>  $configuredDatasets
      * @param  array<string, array<int, array<int, string>>>  $datasets
      */
     private function importYear(
         DataSource $source,
         string $sourceUrl,
-        array $stored,
+        StoredSourceArtifact $stored,
         array $configuredDatasets,
         array $datasets,
         int $year,
@@ -119,7 +120,7 @@ class ImportInepIdeb
             'parameters' => [
                 'reference_year' => $year,
                 'network' => 'Municipal',
-                'artifact_checksum' => $stored['checksum'],
+                'artifact_checksum' => $stored->checksum,
             ],
         ]);
 
@@ -154,18 +155,18 @@ class ImportInepIdeb
                     [
                         'data_source_id' => $source->id,
                         'reference_year' => $year,
-                        'version' => 'official-'.substr($stored['checksum'], 0, 16),
+                        'version' => 'official-'.substr($stored->checksum, 0, 16),
                     ],
                     [
                         'status' => ReleaseStatus::Final,
                         'published_at' => (string) config('municipal_data.ideb.published_at'),
                         'collected_at' => now()->toDateString(),
                         'source_url' => $sourceUrl,
-                        'artifact_disk' => $stored['disk'],
-                        'artifact_path' => $stored['path'],
-                        'checksum_sha256' => $stored['checksum'],
-                        'mime_type' => $stored['mime_type'],
-                        'size_bytes' => $stored['size_bytes'],
+                        'artifact_disk' => $stored->disk,
+                        'artifact_path' => $stored->path,
+                        'checksum_sha256' => $stored->checksum,
+                        'mime_type' => $stored->mimeType,
+                        'size_bytes' => $stored->sizeBytes,
                         'metadata' => [
                             'network' => 'Municipal',
                             'reference_year' => $year,
@@ -317,13 +318,7 @@ class ImportInepIdeb
     {
         $municipalities = [];
 
-        foreach (DB::table('municipalities')->where('is_active', true)->cursor() as $municipality) {
-            $installedAt = is_string($municipality->installed_at) ? $municipality->installed_at : null;
-
-            if ($installedAt !== null && (int) substr($installedAt, 0, 4) > $year) {
-                continue;
-            }
-
+        foreach (Municipality::query()->where('is_active', true)->existingInYear($year)->cursor() as $municipality) {
             $municipalities[(int) $municipality->ibge_code] = (int) $municipality->id;
         }
 

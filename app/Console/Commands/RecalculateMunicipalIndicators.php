@@ -2,7 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\MunicipalData\IndicatorCalculator;
+use App\Actions\MunicipalData\RecalculateHomicideIndicators;
+use App\DTO\MunicipalData\ImportPeriod;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -11,12 +12,14 @@ use Illuminate\Console\Command;
 #[Description('Recalculate derived municipal indicators from immutable inputs')]
 class RecalculateMunicipalIndicators extends Command
 {
-    public function handle(IndicatorCalculator $calculator): int
+    public function handle(RecalculateHomicideIndicators $action): int
     {
         $indicator = $this->argument('indicator');
-        $summary = $calculator->calculate(
-            (int) $this->option('from'),
-            (int) $this->option('to'),
+        $summary = $action->execute(
+            new ImportPeriod(
+                (int) $this->option('from'),
+                (int) $this->option('to'),
+            ),
             is_string($indicator) ? $indicator : null,
         );
 

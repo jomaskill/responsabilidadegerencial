@@ -2,13 +2,13 @@
 
 namespace App\DTO\MunicipalData;
 
-class StoredSourceArtifact
+final readonly class StoredSourceArtifact
 {
-    /**
-     * Create a new class instance.
-     */
-    public function __construct()
-    {
-        //
-    }
+    public function __construct(
+        public string $disk,
+        public string $path,
+        public string $checksum,
+        public string $mimeType,
+        public int $sizeBytes,
+    ) {}
 }

@@ -1,14 +1,30 @@
 <?php
 
-namespace App\MunicipalData\Transformers;
+namespace App\Support\MunicipalData\Transformers;
 
 use App\Enums\AvailabilityStatus;
 use App\Enums\QualityStatus;
-use App\MunicipalData\ObservationTransformer;
 use InvalidArgumentException;
 
-class CanonicalObservationTransformer implements ObservationTransformer
+class CanonicalObservationTransformer
 {
+    /**
+     * @param  array<string, string|null>  $record
+     * @return array{
+     *     municipality_code: string,
+     *     indicator_slug: string,
+     *     indicator_version: int,
+     *     reference_year: int,
+     *     period_start: string|null,
+     *     period_end: string|null,
+     *     value: string|null,
+     *     numerator: string|null,
+     *     denominator: string|null,
+     *     availability_status: AvailabilityStatus,
+     *     quality_status: QualityStatus,
+     *     notes: string|null
+     * }
+     */
     public function transform(array $record): array
     {
         foreach (['municipality_code', 'indicator_slug', 'reference_year'] as $required) {

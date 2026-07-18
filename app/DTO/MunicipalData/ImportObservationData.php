@@ -2,13 +2,17 @@
 
 namespace App\DTO\MunicipalData;
 
-class ImportObservationData
+use App\Enums\ReleaseStatus;
+
+final readonly class ImportObservationData
 {
-    /**
-     * Create a new class instance.
-     */
-    public function __construct()
-    {
-        //
-    }
+    public function __construct(
+        public string $sourceSlug,
+        public string $filePath,
+        public ImportPeriod $period,
+        public ReleaseStatus $releaseStatus,
+        public string $releaseVersion = 'initial',
+        public string $delimiter = ';',
+        public ?string $sourceUrl = null,
+    ) {}
 }

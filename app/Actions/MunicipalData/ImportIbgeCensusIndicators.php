@@ -2,6 +2,8 @@
 
 namespace App\Actions\MunicipalData;
 
+use App\Contracts\MunicipalData\CensusIndicatorFetcher;
+use App\DTO\MunicipalData\ImportSummary;
 use App\Enums\AvailabilityStatus;
 use App\Enums\ProcessingStatus;
 use App\Enums\QualityStatus;
@@ -9,11 +11,10 @@ use App\Enums\ReleaseStatus;
 use App\Models\DataSource;
 use App\Models\IndicatorObservation;
 use App\Models\IndicatorVersion;
+use App\Models\Municipality;
 use App\Models\ProcessingRun;
 use App\Models\SourceRelease;
-use App\MunicipalData\CensusIndicatorFetcher;
-use App\MunicipalData\ImportSummary;
-use App\MunicipalData\Parsers\CensusIndicatorArchiveParser;
+use App\Support\MunicipalData\Parsers\CensusIndicatorArchiveParser;
 use Illuminate\Support\Facades\DB;
 use JsonException;
 use RuntimeException;
@@ -48,7 +49,7 @@ class ImportIbgeCensusIndicators
             'parameters' => [
                 'reference_year' => $year,
                 'indicator_slugs' => array_keys($configuredDatasets),
-                'artifact_checksum' => $stored['checksum'],
+                'artifact_checksum' => $stored->checksum,
             ],
         ]);
 
@@ -97,18 +98,18 @@ class ImportIbgeCensusIndicators
                     [
                         'data_source_id' => $source->id,
                         'reference_year' => $year,
-                        'version' => 'official-'.substr($stored['checksum'], 0, 16),
+                        'version' => 'official-'.substr($stored->checksum, 0, 16),
                     ],
                     [
                         'status' => ReleaseStatus::Final,
                         'published_at' => (string) config('municipal_data.census_indicators.published_at'),
                         'collected_at' => now()->toDateString(),
                         'source_url' => $artifact->sourceUrl,
-                        'artifact_disk' => $stored['disk'],
-                        'artifact_path' => $stored['path'],
-                        'checksum_sha256' => $stored['checksum'],
-                        'mime_type' => $stored['mime_type'],
-                        'size_bytes' => $stored['size_bytes'],
+                        'artifact_disk' => $stored->disk,
+                        'artifact_path' => $stored->path,
+                        'checksum_sha256' => $stored->checksum,
+                        'mime_type' => $stored->mimeType,
+                        'size_bytes' => $stored->sizeBytes,
                         'metadata' => [
                             'reference_year' => $year,
                             'datasets' => $configuredDatasets,
@@ -293,13 +294,7 @@ class ImportIbgeCensusIndicators
     {
         $municipalities = [];
 
-        foreach (DB::table('municipalities')->where('is_active', true)->cursor() as $municipality) {
-            $installedAt = is_string($municipality->installed_at) ? $municipality->installed_at : null;
-
-            if ($installedAt !== null && (int) substr($installedAt, 0, 4) > $year) {
-                continue;
-            }
-
+        foreach (Municipality::query()->where('is_active', true)->existingInYear($year)->cursor() as $municipality) {
             $municipalities[(int) $municipality->ibge_code] = (int) $municipality->id;
         }
 

@@ -2,9 +2,9 @@
 
 namespace App\MunicipalData\Fetchers;
 
-use App\MunicipalData\PopulationFetcher;
-use App\MunicipalData\PopulationSourceDefinition;
-use App\MunicipalData\SourceArtifact;
+use App\Contracts\MunicipalData\PopulationFetcher;
+use App\DTO\MunicipalData\PopulationSourceDefinition;
+use App\DTO\MunicipalData\SourceArtifact;
 use Illuminate\Support\Facades\Http;
 
 class IbgePopulationFetcher implements PopulationFetcher

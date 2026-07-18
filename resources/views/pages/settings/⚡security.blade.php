@@ -17,14 +17,18 @@ new #[Title('Security settings')] class extends Component {
     public string $password = '';
     public string $password_confirmation = '';
 
-
-
-    /**
-     * Mount the component.
-     */
     public function mount(DisableTwoFactorAuthentication $disableTwoFactorAuthentication): void
     {
+        $user = Auth::user();
 
+        if (
+            $user !== null
+            && Features::optionEnabled(Features::twoFactorAuthentication(), 'confirm')
+            && $user->two_factor_secret !== null
+            && $user->two_factor_confirmed_at === null
+        ) {
+            $disableTwoFactorAuthentication($user);
+        }
     }
 
     /**
@@ -51,8 +55,6 @@ new #[Title('Security settings')] class extends Component {
 
         Flux::toast(variant: 'success', text: __('Password updated.'));
     }
-
-
 }; ?>
 
 <section class="w-full">

@@ -2,6 +2,10 @@
 
 namespace App\Actions\MunicipalData;
 
+use App\Contracts\MunicipalData\PopulationFetcher;
+use App\DTO\MunicipalData\ImportPeriod;
+use App\DTO\MunicipalData\ImportSummary;
+use App\DTO\MunicipalData\PopulationSourceDefinition;
 use App\Enums\AvailabilityStatus;
 use App\Enums\ProcessingStatus;
 use App\Enums\QualityStatus;
@@ -12,12 +16,8 @@ use App\Models\IndicatorVersion;
 use App\Models\ProcessingError;
 use App\Models\ProcessingRun;
 use App\Models\SourceRelease;
-use App\MunicipalData\ImportSummary;
-use App\MunicipalData\Parsers\OdsSourceParser;
-use App\MunicipalData\PopulationFetcher;
-use App\MunicipalData\PopulationSourceDefinition;
+use App\Support\MunicipalData\Parsers\PopulationSourceParser;
 use Illuminate\Support\Facades\DB;
-use JsonException;
 use RuntimeException;
 use Throwable;
 
@@ -26,14 +26,13 @@ class ImportIbgePopulation
     public function __construct(
         private readonly PopulationFetcher $fetcher,
         private readonly StoreSourceArtifact $artifactStore,
-        private readonly OdsSourceParser $odsParser,
+        private readonly PopulationSourceParser $parser,
     ) {}
 
-    public function execute(int $fromYear, int $toYear): ImportSummary
+    public function execute(ImportPeriod $period): ImportSummary
     {
-        if ($fromYear > $toYear) {
-            throw new RuntimeException('The initial year must be less than or equal to the final year.');
-        }
+        $fromYear = $period->fromYear;
+        $toYear = $period->toYear;
 
         $source = DataSource::query()->where('slug', 'ibge-populacao')->firstOrFail();
         $indicatorVersion = IndicatorVersion::query()
@@ -46,7 +45,7 @@ class ImportIbgePopulation
         $totalRejected = 0;
         $totalCreated = 0;
 
-        foreach (range($fromYear, $toYear) as $year) {
+        foreach ($period->years() as $year) {
             $definition = $this->definitionFor($year);
 
             if (count($municipalities) < $definition->expectedRecords) {
@@ -98,7 +97,7 @@ class ImportIbgePopulation
                 'reference_year' => $definition->year,
                 'dataset' => $definition->dataset,
                 'source_url' => $definition->url,
-                'artifact_checksum' => $stored['checksum'],
+                'artifact_checksum' => $stored->checksum,
             ],
         ]);
 
@@ -106,7 +105,7 @@ class ImportIbgePopulation
             $records = [];
             $rejectedRows = 0;
 
-            foreach ($this->populationRecords($artifact->contents, $definition) as $rowNumber => $record) {
+            foreach ($this->parser->records($artifact->contents, $definition) as $rowNumber => $record) {
                 try {
                     $code = $record['municipality_code'];
 
@@ -118,7 +117,7 @@ class ImportIbgePopulation
                         throw new RuntimeException("Municipality code is absent from the registry: {$code}");
                     }
 
-                    $availability = $this->availabilityStatus(
+                    $availability = $this->parser->availabilityStatus(
                         rawValue: $record['raw_value'],
                         installedAt: $municipalities[$code]['installed_at'],
                         referenceYear: $definition->year,
@@ -127,7 +126,7 @@ class ImportIbgePopulation
                     $records[$code] = [
                         'municipality_id' => $municipalities[$code]['id'],
                         'value' => $availability === AvailabilityStatus::Available
-                            ? $this->populationValue($record['raw_value'])
+                            ? $this->parser->value($record['raw_value'])
                             : null,
                         'availability_status' => $availability,
                         'source_marker' => $availability === AvailabilityStatus::Available ? null : $record['raw_value'],
@@ -179,18 +178,18 @@ class ImportIbgePopulation
                     [
                         'data_source_id' => $source->id,
                         'reference_year' => $definition->year,
-                        'version' => 'official-'.substr($stored['checksum'], 0, 16),
+                        'version' => 'official-'.substr($stored->checksum, 0, 16),
                     ],
                     [
                         'status' => ReleaseStatus::Final,
                         'published_at' => $definition->publishedAt->format('Y-m-d'),
                         'collected_at' => now()->toDateString(),
                         'source_url' => $artifact->sourceUrl,
-                        'artifact_disk' => $stored['disk'],
-                        'artifact_path' => $stored['path'],
-                        'checksum_sha256' => $stored['checksum'],
-                        'mime_type' => $stored['mime_type'],
-                        'size_bytes' => $stored['size_bytes'],
+                        'artifact_disk' => $stored->disk,
+                        'artifact_path' => $stored->path,
+                        'checksum_sha256' => $stored->checksum,
+                        'mime_type' => $stored->mimeType,
+                        'size_bytes' => $stored->sizeBytes,
                         'metadata' => $this->releaseMetadata($definition),
                     ],
                 );
@@ -284,79 +283,6 @@ class ImportIbgePopulation
         }
 
         return $createdRows;
-    }
-
-    /**
-     * @return iterable<int, array{municipality_code: string, raw_value: string}>
-     *
-     * @throws JsonException
-     */
-    private function populationRecords(string $contents, PopulationSourceDefinition $definition): iterable
-    {
-        if ($definition->format === 'json') {
-            $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
-
-            foreach ($decoded as $index => $row) {
-                $code = $row['D1C'] ?? null;
-
-                if (! is_string($code) || preg_match('/^\d{7}$/', $code) !== 1) {
-                    continue;
-                }
-
-                yield $index + 1 => [
-                    'municipality_code' => $code,
-                    'raw_value' => (string) ($row['V'] ?? ''),
-                ];
-            }
-
-            return;
-        }
-
-        foreach ($this->odsParser->rows($contents) as $rowNumber => $row) {
-            $ufCode = $row[1] ?? '';
-            $municipalityCode = $row[2] ?? '';
-
-            if (preg_match('/^\d{2}$/', $ufCode) !== 1 || preg_match('/^\d{5}$/', $municipalityCode) !== 1) {
-                continue;
-            }
-
-            yield $rowNumber => [
-                'municipality_code' => $ufCode.$municipalityCode,
-                'raw_value' => $row[4] ?? '',
-            ];
-        }
-    }
-
-    private function availabilityStatus(string $rawValue, ?string $installedAt, int $referenceYear): AvailabilityStatus
-    {
-        $withoutFootnotes = preg_replace('/\([^)]*\)|\[[^]]*\]/u', '', $rawValue);
-        $digits = preg_replace('/\D/u', '', $withoutFootnotes ?? '');
-
-        if ($digits !== null && $digits !== '') {
-            return AvailabilityStatus::Available;
-        }
-
-        if ($installedAt !== null && (int) substr($installedAt, 0, 4) > $referenceYear) {
-            return AvailabilityStatus::NotApplicable;
-        }
-
-        return match (trim($rawValue)) {
-            '-', '...' => AvailabilityStatus::MissingFromSource,
-            'X', 'x' => AvailabilityStatus::Suppressed,
-            default => AvailabilityStatus::MissingFromSource,
-        };
-    }
-
-    private function populationValue(string $rawValue): int
-    {
-        $withoutFootnotes = preg_replace('/\([^)]*\)|\[[^]]*\]/u', '', $rawValue);
-        $digits = preg_replace('/\D/u', '', $withoutFootnotes ?? '');
-
-        if ($digits === null || $digits === '') {
-            throw new RuntimeException("Invalid population value: {$rawValue}");
-        }
-
-        return (int) $digits;
     }
 
     /** @return array<string, string> */

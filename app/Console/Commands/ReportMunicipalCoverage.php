@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\MunicipalData\DataQualityAuditor;
+use App\Actions\MunicipalData\ReportMunicipalDataCoverage;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -11,11 +11,11 @@ use Illuminate\Console\Command;
 #[Description('Report municipal coverage for every active indicator')]
 class ReportMunicipalCoverage extends Command
 {
-    public function handle(DataQualityAuditor $auditor): int
+    public function handle(ReportMunicipalDataCoverage $action): int
     {
         $year = (int) ($this->option('year') ?: now()->year);
         $source = $this->option('source');
-        $rows = $auditor->coverage($year, is_string($source) ? $source : null);
+        $rows = $action->execute($year, is_string($source) ? $source : null);
 
         $this->table(
             ['Indicador', 'Tema', 'Municípios esperados', 'Com dado', 'Sem dado', 'Cobertura %'],

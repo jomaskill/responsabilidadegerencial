@@ -1,13 +1,16 @@
 <?php
 
-namespace App\MunicipalData\Parsers;
+namespace App\Support\MunicipalData\Parsers;
 
-use App\MunicipalData\SourceParser;
 use RuntimeException;
 use SplFileObject;
 
-class DelimitedSourceParser implements SourceParser
+class DelimitedSourceParser
 {
+    /**
+     * @param  array<string, mixed>  $options
+     * @return iterable<int, array<string, string|null>>
+     */
     public function records(string $path, array $options = []): iterable
     {
         if (! is_readable($path)) {

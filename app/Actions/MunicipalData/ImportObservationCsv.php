@@ -2,6 +2,9 @@
 
 namespace App\Actions\MunicipalData;
 
+use App\DTO\MunicipalData\ImportObservationData;
+use App\DTO\MunicipalData\ImportSummary;
+use App\DTO\MunicipalData\StoredSourceArtifact;
 use App\Enums\AvailabilityStatus;
 use App\Enums\ProcessingStatus;
 use App\Enums\ReleaseStatus;
@@ -12,9 +15,8 @@ use App\Models\Municipality;
 use App\Models\ProcessingError;
 use App\Models\ProcessingRun;
 use App\Models\SourceRelease;
-use App\MunicipalData\ImportSummary;
-use App\MunicipalData\Parsers\DelimitedSourceParser;
-use App\MunicipalData\Transformers\CanonicalObservationTransformer;
+use App\Support\MunicipalData\Parsers\DelimitedSourceParser;
+use App\Support\MunicipalData\Transformers\CanonicalObservationTransformer;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use RuntimeException;
 use Throwable;
@@ -27,19 +29,16 @@ class ImportObservationCsv
         private readonly CanonicalObservationTransformer $transformer,
     ) {}
 
-    public function execute(
-        string $sourceSlug,
-        string $filePath,
-        int $fromYear,
-        int $toYear,
-        ReleaseStatus $releaseStatus,
-        string $releaseVersion = 'initial',
-        string $delimiter = ';',
-        ?string $sourceUrl = null,
-    ): ImportSummary {
-        if ($fromYear > $toYear) {
-            throw new RuntimeException('The initial year must be less than or equal to the final year.');
-        }
+    public function execute(ImportObservationData $data): ImportSummary
+    {
+        $sourceSlug = $data->sourceSlug;
+        $filePath = $data->filePath;
+        $fromYear = $data->period->fromYear;
+        $toYear = $data->period->toYear;
+        $releaseStatus = $data->releaseStatus;
+        $releaseVersion = $data->releaseVersion;
+        $delimiter = $data->delimiter;
+        $sourceUrl = $data->sourceUrl;
 
         $source = DataSource::query()->where('slug', $sourceSlug)->firstOrFail();
         $artifact = $this->artifactStore->fromFile($source, $filePath);
@@ -195,7 +194,6 @@ class ImportObservationCsv
 
     /**
      * @param  array<int, int>  $years
-     * @param  array{disk: string, path: string, checksum: string, mime_type: string, size_bytes: int}  $artifact
      * @return array<int, SourceRelease>
      */
     private function releases(
@@ -203,7 +201,7 @@ class ImportObservationCsv
         array $years,
         string $version,
         ReleaseStatus $status,
-        array $artifact,
+        StoredSourceArtifact $artifact,
         ?string $sourceUrl,
         int $fromYear,
         int $toYear,
@@ -217,16 +215,16 @@ class ImportObservationCsv
                     'status' => $status,
                     'collected_at' => now()->toDateString(),
                     'source_url' => $sourceUrl,
-                    'artifact_disk' => $artifact['disk'],
-                    'artifact_path' => $artifact['path'],
-                    'checksum_sha256' => $artifact['checksum'],
-                    'mime_type' => $artifact['mime_type'],
-                    'size_bytes' => $artifact['size_bytes'],
+                    'artifact_disk' => $artifact->disk,
+                    'artifact_path' => $artifact->path,
+                    'checksum_sha256' => $artifact->checksum,
+                    'mime_type' => $artifact->mimeType,
+                    'size_bytes' => $artifact->sizeBytes,
                     'metadata' => ['import_from_year' => $fromYear, 'import_to_year' => $toYear],
                 ],
             );
 
-            if (! $release->wasRecentlyCreated && $release->checksum_sha256 !== $artifact['checksum']) {
+            if (! $release->wasRecentlyCreated && $release->checksum_sha256 !== $artifact->checksum) {
                 throw new RuntimeException("Release {$source->slug}/{$year}/{$version} already exists with another checksum. Use a new --release-version.");
             }
 

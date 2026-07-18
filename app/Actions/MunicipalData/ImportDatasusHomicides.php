@@ -2,6 +2,10 @@
 
 namespace App\Actions\MunicipalData;
 
+use App\Contracts\MunicipalData\HomicideFetcher;
+use App\DTO\MunicipalData\HomicideSourceDefinition;
+use App\DTO\MunicipalData\ImportPeriod;
+use App\DTO\MunicipalData\ImportSummary;
 use App\Enums\AvailabilityStatus;
 use App\Enums\ProcessingStatus;
 use App\Enums\QualityStatus;
@@ -9,12 +13,12 @@ use App\Enums\ReleaseStatus;
 use App\Models\DataSource;
 use App\Models\IndicatorObservation;
 use App\Models\IndicatorVersion;
+use App\Models\Municipality;
 use App\Models\ProcessingError;
 use App\Models\ProcessingRun;
 use App\Models\SourceRelease;
-use App\MunicipalData\HomicideFetcher;
-use App\MunicipalData\HomicideSourceDefinition;
-use App\MunicipalData\ImportSummary;
+use App\Support\MunicipalData\Parsers\DatasusHomicideParser;
+use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 use JsonException;
 use RuntimeException;
@@ -25,14 +29,11 @@ class ImportDatasusHomicides
     public function __construct(
         private readonly HomicideFetcher $fetcher,
         private readonly StoreSourceArtifact $artifactStore,
+        private readonly DatasusHomicideParser $parser,
     ) {}
 
-    public function execute(int $fromYear, int $toYear): ImportSummary
+    public function execute(ImportPeriod $period): ImportSummary
     {
-        if ($fromYear > $toYear) {
-            throw new RuntimeException('The initial year must be less than or equal to the final year.');
-        }
-
         $source = DataSource::query()->where('slug', 'datasus-sim')->firstOrFail();
         $indicatorVersion = IndicatorVersion::query()
             ->whereHas('indicator', fn ($query) => $query->where('slug', 'homicide_count'))
@@ -42,7 +43,7 @@ class ImportDatasusHomicides
         $totalAccepted = 0;
         $totalCreated = 0;
 
-        foreach (range($fromYear, $toYear) as $year) {
+        foreach ($period->years() as $year) {
             $definition = $this->definitionFor($year);
 
             if ($definition === null) {
@@ -80,12 +81,12 @@ class ImportDatasusHomicides
                 'reference_year' => $definition->year,
                 'definition' => $definition->definition,
                 'source_file' => $definition->file,
-                'artifact_checksum' => $stored['checksum'],
+                'artifact_checksum' => $stored->checksum,
             ],
         ]);
 
         try {
-            $parsed = $this->parseTabnet($artifact->contents);
+            $parsed = $this->parser->parse($artifact->contents);
             $records = [];
 
             foreach ($municipalities as $sixDigitCode => $municipalityId) {
@@ -126,18 +127,18 @@ class ImportDatasusHomicides
                     [
                         'data_source_id' => $source->id,
                         'reference_year' => $definition->year,
-                        'version' => 'official-'.substr($stored['checksum'], 0, 16),
+                        'version' => 'official-'.substr($stored->checksum, 0, 16),
                     ],
                     [
                         'status' => ReleaseStatus::Final,
                         'published_at' => $definition->publishedAt->format('Y-m-d'),
                         'collected_at' => now()->toDateString(),
                         'source_url' => $artifact->sourceUrl,
-                        'artifact_disk' => $stored['disk'],
-                        'artifact_path' => $stored['path'],
-                        'checksum_sha256' => $stored['checksum'],
-                        'mime_type' => $stored['mime_type'],
-                        'size_bytes' => $stored['size_bytes'],
+                        'artifact_disk' => $stored->disk,
+                        'artifact_path' => $stored->path,
+                        'checksum_sha256' => $stored->checksum,
+                        'mime_type' => $stored->mimeType,
+                        'size_bytes' => $stored->sizeBytes,
                         'metadata' => $this->releaseMetadata($definition, $parsed['national_total']),
                     ],
                 );
@@ -228,72 +229,12 @@ class ImportDatasusHomicides
         return $createdRows;
     }
 
-    /** @return array{counts: array<int, int>, national_total: int, source_rows: int} */
-    private function parseTabnet(string $contents): array
-    {
-        if (preg_match('/<pre[^>]*>(.*?)<\/pre>/is', $contents, $match) !== 1) {
-            throw new RuntimeException('The DATASUS response does not contain the expected table.');
-        }
-
-        $lines = preg_split('/\R/', html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'ISO-8859-1'));
-        $counts = [];
-        $reportedTotal = null;
-        $summedTotal = 0;
-        $sourceRows = 0;
-
-        foreach ($lines ?: [] as $line) {
-            $fields = str_getcsv(trim($line), ';', '"', '');
-
-            if (count($fields) < 2) {
-                continue;
-            }
-
-            $label = trim($fields[0]);
-            $digits = preg_replace('/\D/', '', $fields[1]);
-
-            if ($digits === null || $digits === '') {
-                continue;
-            }
-
-            $value = (int) $digits;
-
-            if (strcasecmp($label, 'Total') === 0) {
-                $reportedTotal = $value;
-
-                continue;
-            }
-
-            $sourceRows++;
-            $summedTotal += $value;
-
-            if (preg_match('/^\s*(\d{6})\s+/', $label, $codeMatch) === 1) {
-                $counts[(int) $codeMatch[1]] = $value;
-            }
-        }
-
-        if ($reportedTotal === null || $reportedTotal !== $summedTotal) {
-            throw new RuntimeException("DATASUS total validation failed: reported {$reportedTotal}, summed {$summedTotal}.");
-        }
-
-        return [
-            'counts' => $counts,
-            'national_total' => $reportedTotal,
-            'source_rows' => $sourceRows,
-        ];
-    }
-
     /** @return array<int, int> */
     private function municipalityRegistry(int $year): array
     {
         $municipalities = [];
 
-        foreach (DB::table('municipalities')->where('is_active', true)->cursor() as $municipality) {
-            $installedAt = is_string($municipality->installed_at) ? $municipality->installed_at : null;
-
-            if ($installedAt !== null && (int) substr($installedAt, 0, 4) > $year) {
-                continue;
-            }
-
+        foreach (Municipality::query()->where('is_active', true)->existingInYear($year)->cursor() as $municipality) {
             $municipalities[(int) substr((string) $municipality->ibge_code, 0, 6)] = (int) $municipality->id;
         }
 
@@ -316,8 +257,18 @@ class ImportDatasusHomicides
     {
         $configuration = config("municipal_data.homicides.years.{$year}");
 
-        return is_array($configuration)
-            ? HomicideSourceDefinition::fromConfiguration($year, $configuration)
-            : null;
+        if (! is_array($configuration)) {
+            return null;
+        }
+
+        return new HomicideSourceDefinition(
+            year: $year,
+            url: (string) config('municipal_data.homicides.url'),
+            file: (string) $configuration['file'],
+            publishedAt: new DateTimeImmutable((string) $configuration['published_at']),
+            expectedMunicipalities: (int) $configuration['expected_municipalities'],
+            definition: (string) config('municipal_data.homicides.definition'),
+            methodologyUrl: (string) config('municipal_data.homicides.methodology_url'),
+        );
     }
 }

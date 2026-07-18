@@ -1,6 +1,6 @@
 <?php
 
-namespace App\MunicipalData\Parsers;
+namespace App\Support\MunicipalData\Parsers;
 
 use RuntimeException;
 use ZipArchive;

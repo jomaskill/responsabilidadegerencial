@@ -2,6 +2,8 @@
 
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Laravel\Fortify\Features;
 use Livewire\Livewire;
 
 beforeEach(function () {});
@@ -29,7 +31,30 @@ test('security settings page renders without two factor when feature is disabled
         ->assertDontSee('Two-factor authentication');
 });
 
-test('two factor authentication disabled when confirmation abandoned between requests', function () {});
+test('two factor authentication disabled when confirmation abandoned between requests', function () {
+    if (! Schema::hasColumn('users', 'two_factor_secret')) {
+        $this->markTestSkipped('Two-factor authentication columns are not installed.');
+    }
+
+    config()->set('fortify.features', [
+        Features::twoFactorAuthentication(['confirm' => true]),
+    ]);
+
+    $user = User::factory()->create([
+        'two_factor_secret' => 'pending-secret',
+        'two_factor_recovery_codes' => json_encode(['pending-code']),
+        'two_factor_confirmed_at' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::settings.security');
+    $user->refresh();
+
+    expect($user->two_factor_secret)->toBeNull()
+        ->and($user->two_factor_recovery_codes)->toBeNull()
+        ->and($user->two_factor_confirmed_at)->toBeNull();
+});
 
 test('password can be updated', function () {
     $user = User::factory()->create([

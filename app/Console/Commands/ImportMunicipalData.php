@@ -10,6 +10,8 @@ use App\Actions\MunicipalData\ImportIbgePopulation;
 use App\Actions\MunicipalData\ImportInepIdeb;
 use App\Actions\MunicipalData\ImportObservationCsv;
 use App\Actions\MunicipalData\ImportSinisaSanitation;
+use App\DTO\MunicipalData\ImportObservationData;
+use App\DTO\MunicipalData\ImportPeriod;
 use App\Enums\ReleaseStatus;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -32,22 +34,25 @@ class ImportMunicipalData extends Command
     ): int {
         try {
             $source = (string) $this->argument('source');
-            $from = (int) ($this->option('from') ?: now()->year);
-            $to = (int) ($this->option('to') ?: $from);
+            $fromOption = $this->option('from');
+            $toOption = $this->option('to');
+            $from = (int) ($fromOption ?: $toOption ?: now()->year);
+            $to = (int) ($toOption ?: $from);
             $file = $this->option('file');
+            $period = new ImportPeriod($from, $to);
 
             if ($source === 'ibge-localidades' && ! is_string($file)) {
                 $summary = $municipalityImporter->execute($to);
             } elseif ($source === 'ibge-populacao' && ! is_string($file)) {
-                $summary = $populationImporter->execute($from, $to);
+                $summary = $populationImporter->execute($period);
             } elseif ($source === 'datasus-sim' && ! is_string($file)) {
-                $summary = $homicideImporter->execute($from, $to);
+                $summary = $homicideImporter->execute($period);
 
                 if ($to > (int) config('municipal_data.homicides.available_through')) {
                     $this->warn((string) config('municipal_data.homicides.unavailable_note'));
                 }
             } elseif ($source === 'ibge-pib-municipios' && ! is_string($file)) {
-                $summary = $gdpImporter->execute($from, $to);
+                $summary = $gdpImporter->execute($period);
 
                 if ($to > (int) config('municipal_data.gdp.available_through')) {
                     $this->warn((string) config('municipal_data.gdp.unavailable_note'));
@@ -55,13 +60,13 @@ class ImportMunicipalData extends Command
             } elseif ($source === 'ibge-censo-2022' && ! is_string($file)) {
                 $summary = $censusIndicatorImporter->execute();
             } elseif ($source === 'inep-ideb' && ! is_string($file)) {
-                $summary = $idebImporter->execute($from, $to);
+                $summary = $idebImporter->execute($period);
 
                 if ($to > (int) config('municipal_data.ideb.available_through')) {
                     $this->warn((string) config('municipal_data.ideb.unavailable_note'));
                 }
             } elseif ($source === 'sinisa' && ! is_string($file)) {
-                $summary = $sanitationImporter->execute($from, $to);
+                $summary = $sanitationImporter->execute($period);
 
                 if ($to > (int) config('municipal_data.sinisa.available_through')) {
                     $this->warn((string) config('municipal_data.sinisa.unavailable_note'));
@@ -81,16 +86,15 @@ class ImportMunicipalData extends Command
                     return self::FAILURE;
                 }
 
-                $summary = $csvImporter->execute(
+                $summary = $csvImporter->execute(new ImportObservationData(
                     sourceSlug: $source,
                     filePath: $file,
-                    fromYear: $from,
-                    toYear: $to,
+                    period: $period,
                     releaseStatus: $status,
                     releaseVersion: (string) $this->option('release-version'),
                     delimiter: (string) $this->option('delimiter'),
                     sourceUrl: is_string($this->option('source-url')) ? $this->option('source-url') : null,
-                );
+                ));
             }
 
             $this->table(

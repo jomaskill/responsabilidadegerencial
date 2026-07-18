@@ -2,17 +2,15 @@
 
 namespace App\Actions\MunicipalData;
 
+use App\DTO\MunicipalData\SourceArtifact;
+use App\DTO\MunicipalData\StoredSourceArtifact;
 use App\Models\DataSource;
-use App\MunicipalData\SourceArtifact;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 class StoreSourceArtifact
 {
-    /**
-     * @return array{disk: string, path: string, checksum: string, mime_type: string, size_bytes: int}
-     */
-    public function fromFile(DataSource $source, string $filePath): array
+    public function fromFile(DataSource $source, string $filePath): StoredSourceArtifact
     {
         $checksum = hash_file('sha256', $filePath);
 
@@ -37,19 +35,16 @@ class StoreSourceArtifact
             fclose($stream);
         }
 
-        return [
-            'disk' => $disk,
-            'path' => $path,
-            'checksum' => $checksum,
-            'mime_type' => mime_content_type($filePath) ?: 'application/octet-stream',
-            'size_bytes' => filesize($filePath) ?: 0,
-        ];
+        return new StoredSourceArtifact(
+            disk: $disk,
+            path: $path,
+            checksum: $checksum,
+            mimeType: mime_content_type($filePath) ?: 'application/octet-stream',
+            sizeBytes: filesize($filePath) ?: 0,
+        );
     }
 
-    /**
-     * @return array{disk: string, path: string, checksum: string, mime_type: string, size_bytes: int}
-     */
-    public function fromFetched(DataSource $source, SourceArtifact $artifact): array
+    public function fromFetched(DataSource $source, SourceArtifact $artifact): StoredSourceArtifact
     {
         $checksum = hash('sha256', $artifact->contents);
         $disk = (string) config('municipal_data.disk');
@@ -59,13 +54,13 @@ class StoreSourceArtifact
             throw new RuntimeException('Unable to store fetched source artifact.');
         }
 
-        return [
-            'disk' => $disk,
-            'path' => $path,
-            'checksum' => $checksum,
-            'mime_type' => $artifact->mimeType,
-            'size_bytes' => strlen($artifact->contents),
-        ];
+        return new StoredSourceArtifact(
+            disk: $disk,
+            path: $path,
+            checksum: $checksum,
+            mimeType: $artifact->mimeType,
+            sizeBytes: strlen($artifact->contents),
+        );
     }
 
     private function path(DataSource $source, string $checksum, string $extension): string
