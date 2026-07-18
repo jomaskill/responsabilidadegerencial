@@ -1,6 +1,20 @@
 <?php
 
+use App\Contracts\MunicipalData\CensusIndicatorFetcher;
+use App\Contracts\MunicipalData\GdpFetcher;
+use App\Contracts\MunicipalData\HomicideFetcher;
+use App\Contracts\MunicipalData\IdebFetcher;
+use App\Contracts\MunicipalData\PopulationFetcher;
+use App\Contracts\MunicipalData\SanitationFetcher;
+use App\Contracts\MunicipalData\SourceFetcher;
 use App\DTO\MunicipalData\ImportPeriod;
+use App\Infrastructure\MunicipalData\Fetchers\DatasusHomicideFetcher;
+use App\Infrastructure\MunicipalData\Fetchers\IbgeCensusIndicatorFetcher;
+use App\Infrastructure\MunicipalData\Fetchers\IbgeGdpFetcher;
+use App\Infrastructure\MunicipalData\Fetchers\IbgeMunicipalityFetcher;
+use App\Infrastructure\MunicipalData\Fetchers\IbgePopulationFetcher;
+use App\Infrastructure\MunicipalData\Fetchers\InepIdebFetcher;
+use App\Infrastructure\MunicipalData\Fetchers\SinisaSanitationFetcher;
 use App\Support\MunicipalData\IndicatorValueRangeValidator;
 
 test('import periods are immutable validated boundaries', function () {
@@ -68,3 +82,15 @@ arch('municipal data commands do not persist directly')
 arch('municipal data integration boundaries are contracts')
     ->expect('App\Contracts\MunicipalData')
     ->toBeInterfaces();
+
+test('municipal data fetchers are infrastructure adapters', function (string $adapter, string $contract) {
+    expect(is_subclass_of($adapter, $contract))->toBeTrue();
+})->with([
+    [IbgeMunicipalityFetcher::class, SourceFetcher::class],
+    [IbgePopulationFetcher::class, PopulationFetcher::class],
+    [DatasusHomicideFetcher::class, HomicideFetcher::class],
+    [IbgeGdpFetcher::class, GdpFetcher::class],
+    [IbgeCensusIndicatorFetcher::class, CensusIndicatorFetcher::class],
+    [InepIdebFetcher::class, IdebFetcher::class],
+    [SinisaSanitationFetcher::class, SanitationFetcher::class],
+]);

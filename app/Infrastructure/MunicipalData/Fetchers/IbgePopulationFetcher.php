@@ -1,6 +1,6 @@
 <?php
 
-namespace App\MunicipalData\Fetchers;
+namespace App\Infrastructure\MunicipalData\Fetchers;
 
 use App\Contracts\MunicipalData\PopulationFetcher;
 use App\DTO\MunicipalData\PopulationSourceDefinition;
