@@ -1,6 +1,6 @@
 <?php
 
-use App\Concerns\ProfileValidationRules;
+use App\Support\Profile\ProfileValidationRules;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -9,8 +9,6 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Title('Profile settings')] class extends Component {
-    use ProfileValidationRules;
-
     public string $name = '';
     public string $email = '';
 
@@ -30,7 +28,7 @@ new #[Title('Profile settings')] class extends Component {
     {
         $user = Auth::user();
 
-        $validated = $this->validate($this->profileRules($user->id));
+        $validated = $this->validate(app(ProfileValidationRules::class)->rules($user->id));
 
         $user->fill($validated);
 
