@@ -1,0 +1,10 @@
+{
+    "platform": "web",
+    "register": "brand",
+    "product": "Responsabilidade Gerencial",
+    "primarySurface": "/",
+    "designSystem": "DESIGN.md",
+    "productContext": "PRODUCT.md",
+    "theme": "light",
+    "primaryColor": "#FCBE26"
+}
