@@ -22,6 +22,24 @@ class Indicator extends Model
         return $this->hasMany(IndicatorVersion::class);
     }
 
+    public function rankingDirection(): IndicatorDirection
+    {
+        $direction = $this->getAttribute('direction');
+
+        return $direction instanceof IndicatorDirection
+            ? $direction
+            : IndicatorDirection::from((string) $direction);
+    }
+
+    public function periodicityValue(): Periodicity
+    {
+        $periodicity = $this->getAttribute('periodicity');
+
+        return $periodicity instanceof Periodicity
+            ? $periodicity
+            : Periodicity::from((string) $periodicity);
+    }
+
     protected function casts(): array
     {
         return [
