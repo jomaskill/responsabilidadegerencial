@@ -104,6 +104,20 @@ O Censo 2022 é a fotografia estrutural disponível para todos os municípios. A
 - Cobertura publicada: 5.211 municípios para água e 2.752 para esgoto. Municípios ausentes ou com marcador `Não Calc.` permanecem como sem dado na fonte.
 - Os produtos SINISA 2025 têm 2024 como ano de referência e deverão ser incorporados como uma nova versão auditada quando as planilhas finais forem estabilizadas.
 
+### Prefeitos eleitos e correspondência TSE–IBGE
+
+As gestões são contexto para a ficha municipal e não alteram diretamente a nota do ranking.
+
+| Dado | Fonte oficial | Arquivo exato |
+| --- | --- | --- |
+| Prefeitos eleitos em 2020 | TSE — Candidatos 2020 | [consulta_cand_2020.zip](https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2020.zip) |
+| Prefeitos eleitos em 2024 | TSE — Candidatos 2024 | [consulta_cand_2024.zip](https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2024.zip) |
+| Correspondência municipal | TSE — Códigos oficiais TSE e IBGE | [municipio_tse_ibge.zip](https://cdn.tse.jus.br/estatistica/sead/odsele/municipio_tse_ibge/municipio_tse_ibge.zip) |
+
+O importador seleciona `DS_CARGO = PREFEITO` e `DS_SIT_TOT_TURNO = ELEITO`, registra `SQ_CANDIDATO` como identificador externo e relaciona `CD_MUNICIPIO` ao código IBGE pela correspondência oficial. Cada ZIP é preservado e recebe checksum SHA-256 no momento da carga.
+
+O MVP cobre somente o eleito na eleição geral. Substituições e eleições suplementares são limitações explícitas e não são inferidas a partir desse arquivo.
+
 ## Disponibilidade por exercício
 
 | Indicador | 2021 | 2022 | 2023 | 2024 | 2025 |
@@ -126,3 +140,5 @@ O Censo 2022 é a fotografia estrutural disponível para todos os municípios. A
 - Auditoria: erros de processamento, alertas e insumos de indicadores derivados.
 
 Não existem tabelas de definição, execução, pontuação ou componentes de ranking. O ranking será uma leitura calculada durante a requisição.
+
+A regra completa está em [`METODOLOGIA_RANKING.md`](METODOLOGIA_RANKING.md).

@@ -7,7 +7,7 @@ Este guia descreve como instalar, configurar, carregar e auditar os dados munici
 - PHP 8.5 com extensões exigidas pelo Laravel, incluindo `curl`, `dom`, `libxml`, `pdo`, `xmlreader` e `zip`.
 - Banco de dados configurado pelo Laravel.
 - Pelo menos 512 MB de memória para processar os arquivos IDEB e SINISA.
-- Saída HTTPS para IBGE, INEP, DATASUS e Ministério das Cidades.
+- Saída HTTPS para IBGE, INEP, DATASUS, Ministério das Cidades e TSE.
 - Certificados de autoridades confiáveis configurados no PHP/cURL.
 - Armazenamento persistente para os arquivos brutos. Não use o disco efêmero do contêiner.
 - Permissão de escrita em `storage` e `bootstrap/cache`.
@@ -28,9 +28,13 @@ MUNICIPAL_DATA_HTTP_TIMEOUT=180
 MUNICIPAL_DATA_HTTP_CONNECT_TIMEOUT=15
 MUNICIPAL_DATA_HTTP_RETRIES=3
 MUNICIPAL_DATA_HTTP_RETRY_SLEEP=1000
+
+CACHE_STORE=redis
 ```
 
 `MUNICIPAL_DATA_DISK` deve apontar para um disco persistente configurado em `config/filesystems.php`. Em servidores com contêiner descartável, configure um volume persistente ou um disco de objetos compatível com a aplicação antes de executar as cargas.
+
+Use um cache compartilhado, preferencialmente Redis, quando houver mais de uma instância da aplicação. O ranking usa uma janela fresca de 10 minutos e stale de até 30 minutos.
 
 As variáveis devem existir antes de executar `php artisan config:cache`.
 
@@ -43,6 +47,7 @@ php artisan db:seed --class=DatabaseSeeder --force --no-interaction
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
+php artisan data:warm-public-cache --no-interaction
 ```
 
 Se o frontend for servido pela mesma implantação:
@@ -62,11 +67,21 @@ php artisan data:import ibge-populacao --from=2021 --to=2025 --no-interaction
 php artisan data:import datasus-sim --from=2021 --to=2024 --no-interaction
 php artisan data:import ibge-pib-municipios --from=2021 --to=2023 --no-interaction
 php artisan data:import ibge-censo-2022 --no-interaction
-php -d memory_limit=512M artisan data:import inep-ideb --from=2021 --to=2023 --no-interaction
+php -d memory_limit=512M artisan data:import inep-ideb --from=2017 --to=2023 --no-interaction
 php -d memory_limit=512M artisan data:import sinisa --from=2023 --to=2023 --no-interaction
+php -d memory_limit=512M artisan data:import tse-administrations --from=2020 --to=2020 --no-interaction
+php -d memory_limit=512M artisan data:import tse-administrations --from=2024 --to=2024 --no-interaction
 ```
 
 Uma execução repetida com os mesmos arquivos oficiais é idempotente: o artefato e as observações não são duplicados.
+
+Depois da carga inicial, aqueça novamente os resultados públicos:
+
+```bash
+php artisan data:warm-public-cache --no-interaction
+```
+
+O comando prepara a home, os rankings consolidados de 2021 a 2025, os destaques por indicador e a evolução das gestões. Ele não cria tabelas nem persiste pontuações.
 
 ## 5. Fontes com arquivo local opcional
 
@@ -88,6 +103,16 @@ MUNICIPAL_DATA_SINISA_SEWER_CORRECTION_1_FILE=/dados/fontes/sinisa-esgoto-retifi
 MUNICIPAL_DATA_SINISA_SEWER_CORRECTION_2_FILE=/dados/fontes/sinisa-esgoto-retificacao-joinville.xlsx
 MUNICIPAL_DATA_SINISA_SEWER_CORRECTION_3_FILE=/dados/fontes/sinisa-esgoto-retificacao-para-de-minas.xlsx
 ```
+
+### TSE
+
+```dotenv
+MUNICIPAL_DATA_TSE_CODES_FILE=/dados/fontes/municipio_tse_ibge.zip
+MUNICIPAL_DATA_TSE_CANDIDATES_2020_FILE=/dados/fontes/consulta_cand_2020.zip
+MUNICIPAL_DATA_TSE_CANDIDATES_2024_FILE=/dados/fontes/consulta_cand_2024.zip
+```
+
+Os caminhos locais do TSE são opcionais. Se não forem configurados, a aplicação baixa os três arquivos do CDN oficial. O checksum calculado é registrado na release e uma alteração futura do arquivo gera uma nova versão, sem sobrescrever a anterior.
 
 Depois de alterar essas variáveis:
 
@@ -133,6 +158,8 @@ Os comandos atuais importam somente as versões explicitamente auditadas em `con
 | Censo | Decenal | Não executar como se fosse série anual |
 | IDEB | Bienal | Auditar os novos pacotes e checksums antes de atualizar a configuração |
 | SINISA | Anual | Auditar planilhas e retificações; criar uma nova configuração por ano de referência |
+| TSE — candidaturas | A cada eleição municipal ou revisão oficial | Reexecutar 2020 ou 2024; o checksum torna a carga idempotente |
+| TSE–IBGE | Sob demanda | Reexecutado automaticamente antes de cada carga de gestão |
 
 O SINISA 2025 possui ano de referência 2024. Essa edição deverá entrar como uma nova versão; não deve sobrescrever o artefato de referência 2023.
 
@@ -145,8 +172,9 @@ Uma rotina de produção deve:
 1. executar o importador;
 2. verificar o código de saída;
 3. executar `data:audit` e `data:coverage`;
-4. registrar os resultados no sistema de logs/alertas;
-5. alertar um responsável quando houver rejeição, checksum divergente ou cobertura inesperada.
+4. executar `data:warm-public-cache`;
+5. registrar os resultados no sistema de logs/alertas;
+6. alertar um responsável quando houver rejeição, checksum divergente ou cobertura inesperada.
 
 Não programe Censo, IDEB ou SINISA para execução diária. A carga deve acompanhar a periodicidade e as publicações oficiais.
 
@@ -161,9 +189,51 @@ Não programe Censo, IDEB ou SINISA para execução diária. A carga deve acompa
 | Município desconhecido | Atualizar primeiro o cadastro IBGE e revisar a referência territorial |
 | Fonte sem dado para um município | Manter `missing_from_source`; não substituir por zero |
 
-## 10. Referências
+## 10. Verificação das páginas públicas
+
+Depois das cargas, valide:
+
+```bash
+php artisan route:list --except-vendor
+php artisan test --compact
+vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+vendor/bin/pint --format agent
+```
+
+Faça uma consulta fria e outra aquecida nas páginas principais:
+
+```text
+GET /
+GET /ranking?year=2025
+GET /prefeitos?electionYear=2020
+```
+
+Metas no ambiente de homologação:
+
+- cálculo frio dos 5.571 municípios em até 2 segundos;
+- resposta com cache em até 250 ms;
+- primeira estrutura visual da home em até 1 segundo;
+- pico de memória abaixo de 128 MB nas consultas públicas;
+- nenhum caminho interno de artefato ou erro bruto presente nas páginas públicas.
+
+Antes de liberar a home, confirme também:
+
+```bash
+php artisan migrate:status
+php artisan data:import tse-administrations --from=2020 --to=2020 --no-interaction
+php artisan data:import tse-administrations --from=2024 --to=2024 --no-interaction
+php artisan data:warm-public-cache --no-interaction
+npm run build
+```
+
+O ranking 2025–2028 permanecerá como `awaiting_new_data` até que pelo menos 60% do perfil nacional avance de ano efetivo. Isso é esperado e não representa falha de implantação.
+
+O deploy deve manter um worker apto a executar callbacks adiados do Laravel. Em plataformas que encerram imediatamente o processo após a resposta, monitore a renovação stale do `Cache::flexible`.
+
+## 11. Referências
 
 - Catálogo de fontes e definições: [`FONTES_DOS_DADOS.md`](FONTES_DOS_DADOS.md)
+- Metodologia do ranking: [`METODOLOGIA_RANKING.md`](METODOLOGIA_RANKING.md)
 - Configuração das versões auditadas: `config/municipal_data.php`
 - Comando de importação: `php artisan data:import --help`
 - Comando de auditoria: `php artisan data:audit --help`
