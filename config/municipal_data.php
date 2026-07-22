@@ -13,6 +13,28 @@ return [
         'ibge_localities_url' => 'https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome',
     ],
     'population' => [
+        2017 => [
+            'url' => 'https://apisidra.ibge.gov.br/values/t/6579/n6/all/v/9324/p/2017?formato=json',
+            'format' => 'json',
+            'methodology' => 'ibge_population_estimate',
+            'statistical_reference_date' => '2017-07-01',
+            'territorial_reference' => '2017',
+            'published_at' => '2024-06-24',
+            'expected_records' => 5571,
+            'expected_available_municipalities' => 5570,
+            'dataset' => 'SIDRA 6579 / variável 9324',
+        ],
+        2020 => [
+            'url' => 'https://apisidra.ibge.gov.br/values/t/6579/n6/all/v/9324/p/2020?formato=json',
+            'format' => 'json',
+            'methodology' => 'ibge_population_estimate',
+            'statistical_reference_date' => '2020-07-01',
+            'territorial_reference' => '2020',
+            'published_at' => '2024-06-24',
+            'expected_records' => 5571,
+            'expected_available_municipalities' => 5570,
+            'dataset' => 'SIDRA 6579 / variável 9324',
+        ],
         2021 => [
             'url' => 'https://apisidra.ibge.gov.br/values/t/6579/n6/all/v/9324/p/2021?formato=json',
             'format' => 'json',
@@ -76,6 +98,8 @@ return [
         'available_through' => 2024,
         'unavailable_note' => 'O SIM não publicou dados municipais definitivos ou preliminares para este exercício.',
         'years' => [
+            2017 => ['file' => 'obtbr17.dbf', 'published_at' => '2025-12-02', 'expected_municipalities' => 5570],
+            2020 => ['file' => 'obtbr20.dbf', 'published_at' => '2025-12-02', 'expected_municipalities' => 5570],
             2021 => ['file' => 'obtbr21.dbf', 'published_at' => '2025-12-02', 'expected_municipalities' => 5570],
             2022 => ['file' => 'obtbr22.dbf', 'published_at' => '2025-12-02', 'expected_municipalities' => 5570],
             2023 => ['file' => 'obtbr23.dbf', 'published_at' => '2025-12-02', 'expected_municipalities' => 5570],
@@ -89,6 +113,8 @@ return [
         'available_through' => 2023,
         'unavailable_note' => 'O IBGE ainda não publicou o PIB municipal para este exercício.',
         'years' => [
+            2017 => ['published_at' => '2025-12-19', 'expected_municipalities' => 5570],
+            2020 => ['published_at' => '2025-12-19', 'expected_municipalities' => 5570],
             2021 => ['published_at' => '2025-12-19', 'expected_municipalities' => 5570],
             2022 => ['published_at' => '2025-12-19', 'expected_municipalities' => 5570],
             2023 => ['published_at' => '2025-12-19', 'expected_municipalities' => 5570],
@@ -183,7 +209,7 @@ return [
         'available_through' => 2023,
         'unavailable_note' => 'O INEP ainda não publicou o IDEB municipal de 2025.',
         'expected_municipalities' => 5570,
-        'cycles' => [2021, 2023],
+        'cycles' => [2017, 2019, 2021, 2023],
         'datasets' => [
             'ideb_initial_years' => [
                 'url' => 'https://download.inep.gov.br/ideb/resultados/divulgacao_anos_iniciais_municipios_2023.zip',
@@ -202,6 +228,30 @@ return [
                 'xlsx_entry' => 'divulgacao_anos_finais_municipios_2023/divulgacao_anos_finais_municipios_2023.xlsx',
                 'expected_source_rows' => 3906,
                 'stage' => 'Ensino Fundamental Regular - Anos Finais',
+            ],
+        ],
+    ],
+    'tse' => [
+        'municipality_codes' => [
+            'url' => 'https://cdn.tse.jus.br/estatistica/sead/odsele/municipio_tse_ibge/municipio_tse_ibge.zip',
+            'local_path' => env('MUNICIPAL_DATA_TSE_CODES_FILE'),
+            'published_at' => '2025-06-24',
+        ],
+        'elections' => [
+            2016 => [
+                'url' => 'https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2016.zip',
+                'local_path' => env('MUNICIPAL_DATA_TSE_CANDIDATES_2016_FILE'),
+                'published_at' => '2021-08-23',
+            ],
+            2020 => [
+                'url' => 'https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2020.zip',
+                'local_path' => env('MUNICIPAL_DATA_TSE_CANDIDATES_2020_FILE'),
+                'published_at' => '2021-08-05',
+            ],
+            2024 => [
+                'url' => 'https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2024.zip',
+                'local_path' => env('MUNICIPAL_DATA_TSE_CANDIDATES_2024_FILE'),
+                'published_at' => '2024-07-19',
             ],
         ],
     ],

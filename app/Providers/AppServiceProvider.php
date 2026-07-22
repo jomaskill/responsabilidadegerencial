@@ -9,6 +9,7 @@ use App\Contracts\MunicipalData\IdebFetcher;
 use App\Contracts\MunicipalData\PopulationFetcher;
 use App\Contracts\MunicipalData\SanitationFetcher;
 use App\Contracts\MunicipalData\SourceFetcher;
+use App\Contracts\MunicipalData\TseElectionFetcher;
 use App\Infrastructure\MunicipalData\Fetchers\DatasusHomicideFetcher;
 use App\Infrastructure\MunicipalData\Fetchers\IbgeCensusIndicatorFetcher;
 use App\Infrastructure\MunicipalData\Fetchers\IbgeGdpFetcher;
@@ -16,6 +17,7 @@ use App\Infrastructure\MunicipalData\Fetchers\IbgeMunicipalityFetcher;
 use App\Infrastructure\MunicipalData\Fetchers\IbgePopulationFetcher;
 use App\Infrastructure\MunicipalData\Fetchers\InepIdebFetcher;
 use App\Infrastructure\MunicipalData\Fetchers\SinisaSanitationFetcher;
+use App\Infrastructure\MunicipalData\Fetchers\TseOpenDataFetcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CensusIndicatorFetcher::class, IbgeCensusIndicatorFetcher::class);
         $this->app->bind(IdebFetcher::class, InepIdebFetcher::class);
         $this->app->bind(SanitationFetcher::class, SinisaSanitationFetcher::class);
+        $this->app->bind(TseElectionFetcher::class, TseOpenDataFetcher::class);
     }
 
     /**

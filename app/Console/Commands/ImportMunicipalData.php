@@ -10,6 +10,7 @@ use App\Actions\MunicipalData\ImportIbgePopulation;
 use App\Actions\MunicipalData\ImportInepIdeb;
 use App\Actions\MunicipalData\ImportObservationCsv;
 use App\Actions\MunicipalData\ImportSinisaSanitation;
+use App\Actions\MunicipalData\ImportTseAdministrations;
 use App\DTO\MunicipalData\ImportObservationData;
 use App\DTO\MunicipalData\ImportPeriod;
 use App\Enums\ReleaseStatus;
@@ -31,6 +32,7 @@ class ImportMunicipalData extends Command
         ImportIbgeCensusIndicators $censusIndicatorImporter,
         ImportInepIdeb $idebImporter,
         ImportSinisaSanitation $sanitationImporter,
+        ImportTseAdministrations $tseAdministrationImporter,
     ): int {
         try {
             $source = (string) $this->argument('source');
@@ -71,6 +73,14 @@ class ImportMunicipalData extends Command
                 if ($to > (int) config('municipal_data.sinisa.available_through')) {
                     $this->warn((string) config('municipal_data.sinisa.unavailable_note'));
                 }
+            } elseif ($source === 'tse-administrations' && ! is_string($file)) {
+                if ($from !== $to || ! in_array($from, [2016, 2020, 2024], true)) {
+                    $this->error('Use --from=2016 --to=2016, --from=2020 --to=2020 or --from=2024 --to=2024.');
+
+                    return self::FAILURE;
+                }
+
+                $summary = $tseAdministrationImporter->execute($from);
             } else {
                 if (! is_string($file) || $file === '') {
                     $this->error('Use --file for sources without a configured official collector.');

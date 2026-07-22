@@ -1,11 +1,15 @@
 <?php
 
+use App\Actions\MunicipalData\ImportTseAdministrations;
 use App\Actions\MunicipalData\ReportMunicipalDataCoverage;
+use App\Models\AdministrationOfficeHolder;
 use App\Models\FederativeUnit;
 use App\Models\IndicatorObservation;
 use App\Models\Municipality;
+use App\Models\MunicipalityIdentifier;
 use App\Models\ProcessingError;
 use App\Models\SourceRelease;
+use App\Support\MunicipalData\Parsers\TseElectionArchiveParser;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -95,3 +99,73 @@ test('published observations cannot be edited or deleted', function () {
     expect(fn () => $observation->delete())
         ->toThrow(RuntimeException::class, 'immutable');
 });
+
+test('tse administrations import is auditable mapped and idempotent', function () {
+    $mapping = tseZipFixture(
+        'municipio_tse_ibge.csv',
+        "CD_MUNICIPIO_TSE;CD_MUNICIPIO_IBGE\n71072;3550308\n",
+    );
+    $candidates = tseZipFixture(
+        'consulta_cand_2024_BRASIL.csv',
+        implode("\n", [
+            'ANO_ELEICAO;NM_TIPO_ELEICAO;SG_UE;DS_CARGO;DS_SIT_TOT_TURNO;SQ_CANDIDATO;NM_URNA_CANDIDATO;NM_CANDIDATO;SG_PARTIDO',
+            '2024;ELEIÇÃO ORDINÁRIA;71072;PREFEITO;ELEITO;250001234567;PREFEITA TESTE;NOME COMPLETO;ABC',
+            '2024;ELEIÇÃO ORDINÁRIA;71072;VEREADOR;ELEITO;250009999999;OUTRO;OUTRO;XYZ',
+            '2024;ELEIÇÃO SUPLEMENTAR;71072;PREFEITO;ELEITO;250008888888;SUPLEMENTAR;SUPLEMENTAR;XYZ',
+        ])."\n",
+    );
+    $revisedCandidates = tseZipFixture(
+        'consulta_cand_2024_BRASIL.csv',
+        implode("\n", [
+            'ANO_ELEICAO;NM_TIPO_ELEICAO;SG_UE;DS_CARGO;DS_SIT_TOT_TURNO;SQ_CANDIDATO;NM_URNA_CANDIDATO;NM_CANDIDATO;SG_PARTIDO',
+            '2024;ELEIÇÃO ORDINÁRIA;71072;PREFEITO;ELEITO;250001234567;PREFEITA REVISADA;NOME COMPLETO;DEF',
+        ])."\n",
+    );
+
+    Http::fake([
+        '*municipio_tse_ibge.zip' => Http::sequence()
+            ->push($mapping, 200, ['Content-Type' => 'application/zip'])
+            ->push($mapping, 200, ['Content-Type' => 'application/zip'])
+            ->push($mapping, 200, ['Content-Type' => 'application/zip']),
+        '*consulta_cand_2024.zip' => Http::sequence()
+            ->push($candidates, 200, ['Content-Type' => 'application/zip'])
+            ->push($candidates, 200, ['Content-Type' => 'application/zip'])
+            ->push($revisedCandidates, 200, ['Content-Type' => 'application/zip']),
+    ]);
+
+    app(ImportTseAdministrations::class)->execute(2024);
+    app(ImportTseAdministrations::class)->execute(2024);
+
+    $holder = AdministrationOfficeHolder::query()->sole();
+
+    expect(MunicipalityIdentifier::query()->where('scheme', 'tse')->value('value'))->toBe('71072')
+        ->and($holder->name)->toBe('PREFEITA TESTE')
+        ->and($holder->external_identifier)->toBe('250001234567')
+        ->and($holder->sourceRelease?->checksum_sha256)->toHaveLength(64)
+        ->and(SourceRelease::query()->count())->toBe(2);
+
+    Http::assertSentCount(4);
+
+    expect(app(TseElectionArchiveParser::class)->electedMayors($revisedCandidates, 2024)[0]['name'])
+        ->toBe('PREFEITA REVISADA');
+
+    app(ImportTseAdministrations::class)->execute(2024);
+
+    expect(AdministrationOfficeHolder::query()->count())->toBe(1)
+        ->and(AdministrationOfficeHolder::query()->value('name'))->toBe('PREFEITA REVISADA')
+        ->and(SourceRelease::query()->count())->toBe(3)
+        ->and(SourceRelease::query()->whereNotNull('superseded_by_id')->count())->toBe(1);
+});
+
+function tseZipFixture(string $entry, string $csv): string
+{
+    $path = tempnam(sys_get_temp_dir(), 'tse-test-');
+    $archive = new ZipArchive;
+    $archive->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $archive->addFromString($entry, $csv);
+    $archive->close();
+    $contents = file_get_contents($path);
+    unlink($path);
+
+    return $contents;
+}

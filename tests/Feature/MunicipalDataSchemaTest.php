@@ -11,7 +11,7 @@ test('municipal data schema and initial catalog are installed', function () {
     $this->seed(DatabaseSeeder::class);
 
     expect(FederativeUnit::query()->count())->toBe(27)
-        ->and(DataSource::query()->count())->toBe(11)
+        ->and(DataSource::query()->count())->toBe(13)
         ->and(Indicator::query()->count())->toBe(14)
         ->and(IndicatorDependency::query()->count())->toBe(5);
 
@@ -25,6 +25,11 @@ test('municipal data schema and initial catalog are installed', function () {
         'value',
         'availability_status',
         'quality_status',
+    ]))->toBeTrue();
+
+    expect(Schema::hasColumns('administration_office_holders', [
+        'source_release_id',
+        'external_identifier',
     ]))->toBeTrue();
 
     expect(Schema::hasTable('ranking_definitions'))->toBeFalse()

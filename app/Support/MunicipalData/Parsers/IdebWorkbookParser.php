@@ -175,12 +175,16 @@ class IdebWorkbookParser
                     throw new RuntimeException("Invalid municipality code in IDEB row {$rowNumber}.");
                 }
 
+                $cycleValues = [];
+
+                foreach ((array) config('municipal_data.ideb.cycles', []) as $cycle) {
+                    $year = (int) $cycle;
+                    $cycleValues[$year] = $values[$requiredColumns["VL_OBSERVADO_{$year}"]] ?? '-';
+                }
+
                 $records[] = [
                     'municipality_code' => (int) $code,
-                    'values' => [
-                        2021 => $values[$requiredColumns['VL_OBSERVADO_2021']] ?? '-',
-                        2023 => $values[$requiredColumns['VL_OBSERVADO_2023']] ?? '-',
-                    ],
+                    'values' => $cycleValues,
                 ];
             }
 
@@ -192,24 +196,28 @@ class IdebWorkbookParser
 
     /**
      * @param  array<int, string>  $values
-     * @return array{CO_MUNICIPIO: int, REDE: int, VL_OBSERVADO_2021: int, VL_OBSERVADO_2023: int}
+     * @return array<string, int>
      */
     private function requiredColumns(array $values): array
     {
         $headers = array_flip($values);
 
-        foreach (['CO_MUNICIPIO', 'REDE', 'VL_OBSERVADO_2021', 'VL_OBSERVADO_2023'] as $header) {
+        $requiredHeaders = ['CO_MUNICIPIO', 'REDE'];
+
+        foreach ((array) config('municipal_data.ideb.cycles', []) as $cycle) {
+            $requiredHeaders[] = 'VL_OBSERVADO_'.(int) $cycle;
+        }
+
+        foreach ($requiredHeaders as $header) {
             if (! isset($headers[$header])) {
                 throw new RuntimeException("The IDEB workbook is missing column {$header}.");
             }
         }
 
-        return [
-            'CO_MUNICIPIO' => (int) $headers['CO_MUNICIPIO'],
-            'REDE' => (int) $headers['REDE'],
-            'VL_OBSERVADO_2021' => (int) $headers['VL_OBSERVADO_2021'],
-            'VL_OBSERVADO_2023' => (int) $headers['VL_OBSERVADO_2023'],
-        ];
+        return array_map(
+            fn (string $header): int => (int) $headers[$header],
+            array_combine($requiredHeaders, $requiredHeaders),
+        );
     }
 
     /** @return array<int, string> */

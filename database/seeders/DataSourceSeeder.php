@@ -24,6 +24,8 @@ class DataSourceSeeder extends Seeder
             ['slug' => 'ibge-alfabetizacao', 'name' => 'Alfabetização no Censo Demográfico', 'publisher' => 'IBGE', 'acquisition_method' => 'sidra_csv', 'homepage_url' => 'https://sidra.ibge.gov.br/'],
             ['slug' => 'system-calculated', 'name' => 'Indicadores calculados pelo sistema', 'publisher' => 'Responsabilidade Gerencial', 'acquisition_method' => 'derived', 'homepage_url' => 'https://localhost'],
             ['slug' => 'manual-compiled', 'name' => 'Compilado manual auditado', 'publisher' => 'Responsabilidade Gerencial', 'acquisition_method' => 'manual_csv', 'homepage_url' => 'https://localhost'],
+            ['slug' => 'tse-candidatos', 'name' => 'Candidaturas municipais', 'publisher' => 'Tribunal Superior Eleitoral', 'acquisition_method' => 'official_zip_csv', 'homepage_url' => 'https://dadosabertos.tse.jus.br/group/candidatos'],
+            ['slug' => 'tse-municipality-codes', 'name' => 'Correspondência de municípios TSE–IBGE', 'publisher' => 'Tribunal Superior Eleitoral', 'acquisition_method' => 'official_zip_csv', 'homepage_url' => 'https://dadosabertos.tse.jus.br/dataset/codigos-oficiais-de-uf-e-municipios-segundo-o-tse-e-o-ibge'],
         ];
 
         foreach ($sources as $source) {
