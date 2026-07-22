@@ -8,8 +8,41 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@font-face {
+    font-family: 'Source Sans 3';
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('/fonts/source-sans-3-latin.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Barlow Condensed';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('/fonts/barlow-condensed-600-latin.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Barlow Condensed';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('/fonts/barlow-condensed-700-latin.woff2') format('woff2');
+}
+
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Source Sans 3', 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Barlow Condensed', 'Arial Narrow', ui-sans-serif, system-ui, sans-serif;
+
+    --color-brand: #fcbe26;
+    --color-brand-strong: #d49700;
+    --color-ink: #171717;
+    --color-muted: #525252;
+    --color-canvas: #ffffff;
+    --color-surface: #f4f4f3;
+    --color-rule: #d7d7d4;
 
     --color-zinc-50: #fafafa;
     --color-zinc-100: #f5f5f5;
@@ -45,6 +78,33 @@
     ::file-selector-button {
         border-color: var(--color-gray-200, currentColor);
     }
+
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        font-variant-numeric: proportional-nums;
+    }
+
+    :focus-visible {
+        outline: 3px solid var(--color-brand);
+        outline-offset: 3px;
+    }
+
+    h1,
+    h2,
+    h3 {
+        text-wrap: balance;
+    }
+
+    p {
+        text-wrap: pretty;
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
 }
 
 [data-flux-field]:not(ui-radio, ui-checkbox) {
@@ -59,6 +119,56 @@ input:focus[data-flux-control],
 textarea:focus[data-flux-control],
 select:focus[data-flux-control] {
     @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
+}
+
+@layer components {
+    .public-display {
+        font-family: var(--font-display);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 0.98;
+    }
+
+    .public-section-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        line-height: 1.05;
+    }
+
+    .public-numeral {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .public-tabular {
+        font-variant-numeric: tabular-nums;
+    }
+
+    .public-link {
+        text-decoration-color: var(--color-brand);
+        text-decoration-thickness: 2px;
+        text-underline-offset: 4px;
+    }
+
+    .public-link:hover {
+        text-decoration-line: underline;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 /* \[:where(&)\]:size-4 {
